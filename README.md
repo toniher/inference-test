@@ -1,6 +1,6 @@
 # inference-test
 
-A test bed for [`actions/ai-inference@v3`](https://github.com/actions/ai-inference). v3 runs prompts through the GitHub Copilot CLI, so every job needs a Copilot-enabled account behind it. The plan is in [PLAN.md](PLAN.md). Only Phase 1 (plain prompts) exists so far. MCP tests come later.
+A test bed for [`actions/ai-inference@v3`](https://github.com/actions/ai-inference). v3 runs prompts through the GitHub Copilot CLI, so every job needs a Copilot-enabled account behind it. The plan is in [PLAN.md](PLAN.md). Phases 1 (plain prompts) and 2 (MCP basics) exist so far. edammcp comes later.
 
 ## What you need to set up
 
@@ -16,7 +16,7 @@ Classic tokens (`ghp_`) don't work with the Copilot CLI. The token must be fine-
 2. Set **Resource owner** to your personal account. Organizations don't offer the Copilot permission.
 3. Set an expiration. Short is fine: you can regenerate it.
 4. Pick any **Repository access** option, such as "Public repositories".
-5. Under **Permissions**, open the **Account** tab, click **Add permissions**, and select **Copilot Requests**.
+5. Under **Permissions**, open the **Account** tab, click **Add permissions**, and select **Copilot Requests** with the **Read-only** access level. This worked in the first successful run.
 6. Generate the token and copy it. GitHub shows it once.
 
 This permission doesn't appear on the REST API page listing fine-grained permissions, because it isn't a REST API permission. Source: [Authenticating Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli).
@@ -53,13 +53,16 @@ gh run view --log-failed   # if something broke
 
 Or use Actions → ai-inference → Run workflow in the web UI. Each job also writes the model response to the run summary.
 
-## What Phase 1 tests
+## What the jobs test
 
 | Job | Checks | Passes when |
 | --- | --- | --- |
 | `simple-prompt` | Inline `prompt` input | Response contains `PONG` |
 | `prompt-file` | `prompt-file` and `system-prompt-file` with plain text files | Response contains `PONG` |
 | `prompt-yml` | A `.prompt.yml` template filled from `input` and `file_input` (the README) | Response mentions `inference-test` |
+| `dummy-mcp` | Local stdio MCP server (`mcp/dummy_server.py`) registered in `~/.copilot/mcp-config.json`, allowed with `copilot-allow-tools: dummy` | Response has `PURPLE-OTTER-4217` and `42`, values only the tools can supply |
+| `dummy-mcp-denied` | Same server, no `copilot-allow-tools` | Response lacks the secret. Observational: failure doesn't fail the run |
+| `github-mcp` | Copilot's built-in GitHub MCP server, `copilot-allow-tools: github-mcp-server` | Response lists `README.md`. Observational: the server name is unverified |
 
 Assertions are case-insensitive regex matches (see `scripts/assert_contains.sh`), because model output varies between runs. A job fails fast with a clear message if `COPILOT_PAT` is empty.
 
@@ -74,9 +77,11 @@ Assertions are case-insensitive regex matches (see `scripts/assert_contains.sh`)
 ## Layout
 
 ```
-.github/workflows/ai-inference.yml        Phase 1 jobs
+.github/workflows/ai-inference.yml        Phase 1 and 2 jobs
 .github/actions/setup-copilot/            installs Node and the Copilot CLI, checks the token
 .github/prompts/                          prompt and system-prompt files
 scripts/assert_contains.sh                response assertions
+mcp/dummy_server.py                       dummy MCP server (pin `mcp<2`; 2.x renamed FastMCP)
+mcp/smoke_dummy.py                        calls the dummy server directly, no LLM
 PLAN.md                                   full plan, including MCP phases
 ```

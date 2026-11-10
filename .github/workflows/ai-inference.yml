@@ -7,6 +7,7 @@ on:
     paths:
       - .github/**
       - scripts/**
+      - mcp/**
       - README.md
 
 permissions:
@@ -62,3 +63,77 @@ jobs:
           file_input: |
             readme: ./README.md
       - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" 'inference-test'
+
+  dummy-mcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-copilot
+        with:
+          token: ${{ secrets.COPILOT_PAT }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: pip install -r mcp/requirements.txt
+      - name: Smoke test dummy server (no LLM)
+        run: python mcp/smoke_dummy.py mcp/dummy_server.py
+      - name: Register dummy MCP server with Copilot CLI
+        run: |
+          mkdir -p ~/.copilot
+          cat > ~/.copilot/mcp-config.json <<JSON
+          {"mcpServers":{"dummy":{"type":"local","command":"python","args":["$GITHUB_WORKSPACE/mcp/dummy_server.py"],"tools":["*"]}}}
+          JSON
+      - id: inference
+        uses: actions/ai-inference@v3
+        with:
+          prompt: Call the secret_word tool and the add tool with 17 and 25. Reply with both results.
+          model: ''
+          copilot-allow-tools: dummy
+      - run: |
+          scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" 'PURPLE-OTTER-4217'
+          scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" '\b42\b'
+
+  dummy-mcp-denied:
+    # Observational: no allow-tool, so the tool call should be blocked.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-copilot
+        with:
+          token: ${{ secrets.COPILOT_PAT }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: pip install -r mcp/requirements.txt
+      - name: Smoke test dummy server (no LLM)
+        run: python mcp/smoke_dummy.py mcp/dummy_server.py
+      - name: Register dummy MCP server with Copilot CLI
+        run: |
+          mkdir -p ~/.copilot
+          cat > ~/.copilot/mcp-config.json <<JSON
+          {"mcpServers":{"dummy":{"type":"local","command":"python","args":["$GITHUB_WORKSPACE/mcp/dummy_server.py"],"tools":["*"]}}}
+          JSON
+      - id: inference
+        uses: actions/ai-inference@v3
+        with:
+          prompt: Call the secret_word tool and reply with its result.
+          model: ''
+      - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" 'PURPLE-OTTER-4217' --not
+
+  github-mcp:
+    # Observational: the built-in server name for --allow-tool is unverified.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-copilot
+        with:
+          token: ${{ secrets.COPILOT_PAT }}
+      - id: inference
+        uses: actions/ai-inference@v3
+        with:
+          prompt: Use the GitHub tools to list the files in the root of toniher/inference-test. Reply with the file names only.
+          model: ''
+          copilot-allow-tools: github-mcp-server
+      - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" 'README\.md'
