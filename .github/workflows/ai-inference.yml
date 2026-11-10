@@ -27,7 +27,7 @@ jobs:
         uses: actions/ai-inference@v3
         with:
           prompt: Reply with exactly the word PONG and nothing else.
-          model: gpt-4.1
+          model: ''
       - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" '\bpong\b'
 
   prompt-file:
@@ -42,7 +42,7 @@ jobs:
         with:
           prompt-file: ./.github/prompts/pong.prompt.txt
           system-prompt-file: ./.github/prompts/system.txt
-          model: gpt-4.1
+          model: ''
       - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" '\bpong\b'
 
   prompt-yml:
@@ -56,6 +56,7 @@ jobs:
         uses: actions/ai-inference@v3
         with:
           prompt-file: ./.github/prompts/summary.prompt.yml
+          model: ''
           input: |
             repo: ${{ github.repository }}
           file_input: |

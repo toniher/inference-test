@@ -68,7 +68,7 @@ Assertions are case-insensitive regex matches (see `scripts/assert_contains.sh`)
 - **Fork pull requests get no secrets.** The workflow runs on `push` to `main` and on manual dispatch only, so this doesn't come up here. Don't add a `pull_request` trigger without thinking about it.
 - **Each run uses Copilot quota.** Each job makes at least one model call. The path filter on `push` keeps unrelated commits from triggering runs.
 - **The token expires.** An expired PAT shows up as an authentication failure in the action, not as the "secret is empty" error.
-- **Model names.** Jobs use `gpt-4.1`, the action's default. If Copilot rejects it for your plan, change `model:` in the workflow and in `.github/prompts/summary.prompt.yml`.
+- **Model names.** Jobs set `model: ''` so the Copilot CLI picks its default. The action's own default, `gpt-4.1`, is not available on every plan: it failed with `Model "gpt-4.1" is not available`. To pin a model, set `model:` in the workflow.
 - **Not verified yet.** These workflows have not been run. The first run may need small fixes.
 
 ## Layout
