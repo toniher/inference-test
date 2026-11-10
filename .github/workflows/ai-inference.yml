@@ -1,0 +1,63 @@
+name: ai-inference
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/**
+      - scripts/**
+      - README.md
+
+permissions:
+  contents: read
+
+env:
+  COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+
+jobs:
+  simple-prompt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-copilot
+        with:
+          token: ${{ secrets.COPILOT_PAT }}
+      - id: inference
+        uses: actions/ai-inference@v3
+        with:
+          prompt: Reply with exactly the word PONG and nothing else.
+          model: gpt-4.1
+      - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" '\bpong\b'
+
+  prompt-file:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-copilot
+        with:
+          token: ${{ secrets.COPILOT_PAT }}
+      - id: inference
+        uses: actions/ai-inference@v3
+        with:
+          prompt-file: ./.github/prompts/pong.prompt.txt
+          system-prompt-file: ./.github/prompts/system.txt
+          model: gpt-4.1
+      - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" '\bpong\b'
+
+  prompt-yml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-copilot
+        with:
+          token: ${{ secrets.COPILOT_PAT }}
+      - id: inference
+        uses: actions/ai-inference@v3
+        with:
+          prompt-file: ./.github/prompts/summary.prompt.yml
+          input: |
+            repo: ${{ github.repository }}
+          file_input: |
+            readme: ./README.md
+      - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" 'inference-test'

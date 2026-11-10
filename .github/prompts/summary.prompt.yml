@@ -1,0 +1,10 @@
+messages:
+  - role: system
+    content: Be terse. No markdown.
+  - role: user
+    content: |
+      Repository: {{repo}}
+      Write one sentence saying what this repository is for, based on this README:
+      {{readme}}
+      Start the sentence with the repository name.
+model: gpt-4.1

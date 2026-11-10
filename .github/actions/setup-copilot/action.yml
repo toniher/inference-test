@@ -1,0 +1,22 @@
+name: Setup Copilot CLI
+description: Install Node and the Copilot CLI; fail early if the token is missing.
+inputs:
+  token:
+    description: Copilot PAT (secrets.COPILOT_PAT)
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Check token
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
+      run: |
+        if [ -z "$TOKEN" ]; then
+          echo "::error::Secret COPILOT_PAT is empty or missing. See README.md."
+          exit 1
+        fi
+    - uses: actions/setup-node@v6
+    - name: Install Copilot CLI
+      shell: bash
+      run: npm install -g @github/copilot
