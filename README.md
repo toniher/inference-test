@@ -79,6 +79,7 @@ Assertions look for any ID of the form `topic|operation|data|format_NNNN`, becau
 
 Things to watch:
 
+- **Python version.** The setup uses Python 3.13: `onnxruntime` (an edammcp dependency) has no wheel for the 3.14 that the runner image ships, so `uv sync` failed on the first run.
 - **Install size and time.** The sentence-transformers dependency pulls in PyTorch. A local `.venv` was 5.7 GB. The workflow caches uv and the Hugging Face model (`all-MiniLM-L6-v2`). The `edam-smoke` job writes its duration to the run summary, so the first run shows what a cold start costs.
 - **Server startup.** The server downloads the EDAM ontology and builds embeddings for about 2,400 concepts on start (about 20 s locally with warm caches). Each setup runs the smoke test first to warm the ontology and model caches before Copilot starts the server. If the Copilot CLI's MCP startup timeout is shorter than a cold start, `edam-llm` fails with no tool call.
 - **Network.** The server fetches `edamontology.org/EDAM.owl` and calls the bio.tools API. Either being down fails `edam-smoke`.

@@ -22,10 +22,10 @@ runs:
         key: hf-all-MiniLM-L6-v2-${{ inputs.sha }}
     - name: Install edammcp
       shell: bash
-      run: uv sync --directory edammcp
+      run: uv sync --python 3.13 --directory edammcp
     - name: Warm caches and smoke test (no LLM)
       shell: bash
       run: |
         start=$(date +%s)
-        uv run --with-requirements mcp/requirements.txt python mcp/edam_smoke.py "$GITHUB_WORKSPACE/edammcp"
+        uv run --python 3.13 --with-requirements mcp/requirements.txt python mcp/edam_smoke.py "$GITHUB_WORKSPACE/edammcp"
         echo "### edammcp smoke: $(( $(date +%s) - start ))s" >> "$GITHUB_STEP_SUMMARY"
