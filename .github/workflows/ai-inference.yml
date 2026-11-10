@@ -28,7 +28,7 @@ jobs:
         uses: actions/ai-inference@v3
         with:
           prompt: Reply with exactly the word PONG and nothing else.
-          model: ''
+          model: claude-haiku-5.5
       - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" '\bpong\b'
 
   prompt-file:
@@ -43,7 +43,7 @@ jobs:
         with:
           prompt-file: ./.github/prompts/pong.prompt.txt
           system-prompt-file: ./.github/prompts/system.txt
-          model: ''
+          model: claude-haiku-5.5
       - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" '\bpong\b'
 
   prompt-yml:
@@ -57,7 +57,7 @@ jobs:
         uses: actions/ai-inference@v3
         with:
           prompt-file: ./.github/prompts/summary.prompt.yml
-          model: ''
+          model: claude-haiku-5.5
           input: |
             repo: ${{ github.repository }}
           file_input: |
@@ -87,7 +87,7 @@ jobs:
         uses: actions/ai-inference@v3
         with:
           prompt: Call the secret_word tool and the add tool with 17 and 25. Reply with both results.
-          model: ''
+          model: claude-haiku-5.5
           copilot-allow-tools: dummy
       - run: |
           scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" 'PURPLE-OTTER-4217'
@@ -118,7 +118,7 @@ jobs:
         uses: actions/ai-inference@v3
         with:
           prompt: Call the secret_word tool and reply with its result.
-          model: ''
+          model: claude-haiku-5.5
       - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" 'PURPLE-OTTER-4217' --not
 
   github-mcp:
@@ -134,6 +134,6 @@ jobs:
         uses: actions/ai-inference@v3
         with:
           prompt: Use the GitHub tools to list the files in the root of toniher/inference-test. Reply with the file names only.
-          model: ''
+          model: claude-haiku-5.5
           copilot-allow-tools: github-mcp-server
       - run: scripts/assert_contains.sh "${{ steps.inference.outputs.response-file }}" 'README\.md'

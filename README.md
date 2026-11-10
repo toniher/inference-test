@@ -1,6 +1,6 @@
 # inference-test
 
-A test bed for [`actions/ai-inference@v3`](https://github.com/actions/ai-inference). v3 runs prompts through the GitHub Copilot CLI, so every job needs a Copilot-enabled account behind it. The plan is in [PLAN.md](PLAN.md). Phases 1 (plain prompts) and 2 (MCP basics) exist so far. edammcp comes later.
+A test bed for [`actions/ai-inference@v3`](https://github.com/actions/ai-inference). v3 runs prompts through the GitHub Copilot CLI, so every job needs a Copilot-enabled account behind it. The plan is in [PLAN.md](PLAN.md). Phases 1 (plain prompts), 2 (MCP basics) and 3 ([edammcp](https://github.com/edamontology/edammcp)) exist.
 
 ## What you need to set up
 
@@ -66,22 +66,61 @@ Or use Actions → ai-inference → Run workflow in the web UI. Each job also wr
 
 Assertions are case-insensitive regex matches (see `scripts/assert_contains.sh`), because model output varies between runs. A job fails fast with a clear message if `COPILOT_PAT` is empty.
 
+## edammcp (`edam-mcp.yml`)
+
+Tests the [EDAM ontology MCP server](https://github.com/edamontology/edammcp) through the Copilot CLI, using a pinned commit (`8e9cc81…`, set in `.github/actions/setup-edam/action.yml`). Bump the pin on purpose.
+
+| Job | Checks | Passes when |
+| --- | --- | --- |
+| `edam-smoke` | `mcp/edam_smoke.py` calls `map_to_edam_concept_tool` and `query_biotools_by_text_exact_match_tool` directly. No LLM, no secrets | Mapping returns EDAM IDs and bio.tools returns BWA |
+| `edam-llm` | Runs after `edam-smoke`. Two prompts with `copilot-allow-tools: edam`: map "short read aligner", then annotate `fixtures/meta.yml` from a `.prompt.yml` template | Both responses contain an EDAM ID such as `operation_3198` |
+
+Assertions look for any ID of the form `topic|operation|data|format_NNNN`, because the mapping scores and top matches vary. The LLM jobs can't prove the model called the tool rather than recalling an ID. The model is told not to answer from memory, which is the only guard.
+
+Things to watch:
+
+- **Install size and time.** The sentence-transformers dependency pulls in PyTorch. A local `.venv` was 5.7 GB. The workflow caches uv and the Hugging Face model (`all-MiniLM-L6-v2`). The `edam-smoke` job writes its duration to the run summary, so the first run shows what a cold start costs.
+- **Server startup.** The server downloads the EDAM ontology and builds embeddings for about 2,400 concepts on start (about 20 s locally with warm caches). Each setup runs the smoke test first to warm the ontology and model caches before Copilot starts the server. If the Copilot CLI's MCP startup timeout is shorter than a cold start, `edam-llm` fails with no tool call.
+- **Network.** The server fetches `edamontology.org/EDAM.owl` and calls the bio.tools API. Either being down fails `edam-smoke`.
+- **Not tested here yet.** A denied-tool variant like `dummy-mcp-denied` is left out: the model knows EDAM IDs, so a pass or fail would say little about tool access.
+
+## Model choice
+
+The action's default, `gpt-4.1`, was retired from Copilot on 2026-06-01, so the first run failed with `Model "gpt-4.1" is not available`. The jobs now pin `claude-haiku-5.5`:
+
+- **Cheap.** It ties with GPT-6 Luna for the lowest per-token price on the pricing page: $0.10 per 1M input tokens and $0.50 per 1M output tokens. A test prompt costs a fraction of a cent.
+- **Stable.** A pinned model doesn't change under the tests, and the model that ran is known.
+- **Tested.** Both `claude-haiku-5.5` and `gpt-6-luna` answered `PONG` locally with `copilot --model <id>`. The ID format is lowercase and dashed, with a dot in the version.
+
+Whether the CI token's plan includes `claude-haiku-5.5` is only known after a run. If it fails with "not available", switch to `gpt-6-luna` in `.github/workflows/ai-inference.yml`. Setting `model: ''` makes the CLI choose its own default, but the log doesn't say which model that was.
+
+References:
+
+- [Supported AI models in GitHub Copilot](https://docs.github.com/en/copilot/reference/ai-models/supported-models): model list, per-client and per-plan availability, retirement history (GPT-4.1).
+- [Models and pricing for GitHub Copilot](https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing): per-token prices. Copilot bills in GitHub AI Credits (1 credit = $0.01).
+
+Model availability depends on the Copilot plan and on organization policy, and the page's availability tables didn't survive text extraction, so check them in a browser if a model is rejected.
+
 ## Things that will trip you up
 
 - **Fork pull requests get no secrets.** The workflow runs on `push` to `main` and on manual dispatch only, so this doesn't come up here. Don't add a `pull_request` trigger without thinking about it.
 - **Each run uses Copilot quota.** Each job makes at least one model call. The path filter on `push` keeps unrelated commits from triggering runs.
 - **The token expires.** An expired PAT shows up as an authentication failure in the action, not as the "secret is empty" error.
-- **Model names.** Jobs set `model: ''` so the Copilot CLI picks its default. The action's own default, `gpt-4.1`, is not available on every plan: it failed with `Model "gpt-4.1" is not available`. To pin a model, set `model:` in the workflow.
+- **Model.** Jobs pin `model: claude-haiku-5.5`. See [Model choice](#model-choice).
 - **Not verified yet.** These workflows have not been run. The first run may need small fixes.
 
 ## Layout
 
 ```
 .github/workflows/ai-inference.yml        Phase 1 and 2 jobs
+.github/workflows/edam-mcp.yml            Phase 3 jobs
+.github/actions/setup-edam/               installs a pinned edammcp, caches, warms, smoke-tests
 .github/actions/setup-copilot/            installs Node and the Copilot CLI, checks the token
 .github/prompts/                          prompt and system-prompt files
 scripts/assert_contains.sh                response assertions
 mcp/dummy_server.py                       dummy MCP server (pin `mcp<2`; 2.x renamed FastMCP)
 mcp/smoke_dummy.py                        calls the dummy server directly, no LLM
+mcp/edam_smoke.py                         calls edammcp directly, no LLM
+fixtures/meta.yml                         sample tool description for the annotate prompt
 PLAN.md                                   full plan, including MCP phases
 ```

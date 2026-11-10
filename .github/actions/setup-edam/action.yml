@@ -1,0 +1,31 @@
+name: Setup edammcp
+description: Check out a pinned edammcp, install it with uv, cache the embedding model, warm the caches.
+inputs:
+  sha:
+    description: edammcp commit to test
+    default: 8e9cc813b3d63a7f900c6a84a7da13f4bd099500
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v6
+      with:
+        repository: edamontology/edammcp
+        ref: ${{ inputs.sha }}
+        path: edammcp
+    - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      with:
+        enable-cache: true
+        cache-dependency-glob: edammcp/uv.lock
+    - uses: actions/cache@v6.1.0
+      with:
+        path: ~/.cache/huggingface
+        key: hf-all-MiniLM-L6-v2-${{ inputs.sha }}
+    - name: Install edammcp
+      shell: bash
+      run: uv sync --directory edammcp
+    - name: Warm caches and smoke test (no LLM)
+      shell: bash
+      run: |
+        start=$(date +%s)
+        uv run --with-requirements mcp/requirements.txt python mcp/edam_smoke.py "$GITHUB_WORKSPACE/edammcp"
+        echo "### edammcp smoke: $(( $(date +%s) - start ))s" >> "$GITHUB_STEP_SUMMARY"

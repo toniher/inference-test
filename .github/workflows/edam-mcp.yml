@@ -1,0 +1,64 @@
+name: edam-mcp
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/edam-mcp.yml
+      - .github/actions/setup-edam/**
+      - .github/actions/setup-copilot/**
+      - mcp/edam_smoke.py
+      - .github/prompts/edam-annotate.prompt.yml
+      - fixtures/**
+
+permissions:
+  contents: read
+
+env:
+  # Bare IDs are enough: the model may drop the URL prefix.
+  EDAM_URI_RE: '(topic|operation|data|format)_[0-9]{4}'
+
+jobs:
+  edam-smoke:
+    # No LLM, no secrets: checks the server and its tools directly.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-edam
+
+  edam-llm:
+    needs: edam-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-copilot
+        with:
+          token: ${{ secrets.COPILOT_PAT }}
+      - uses: ./.github/actions/setup-edam
+      - name: Register edammcp with Copilot CLI
+        run: |
+          mkdir -p ~/.copilot
+          cat > ~/.copilot/mcp-config.json <<JSON
+          {"mcpServers":{"edam":{"type":"local","command":"uv","args":["--directory","$GITHUB_WORKSPACE/edammcp","run","edam-mcp"],"tools":["*"]}}}
+          JSON
+      - id: map
+        uses: actions/ai-inference@v3
+        with:
+          prompt: Use the EDAM tools to map "short read aligner" to EDAM concepts. Reply with the concept URIs only.
+          model: claude-haiku-5.5
+          copilot-allow-tools: edam
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+      - run: scripts/assert_contains.sh "${{ steps.map.outputs.response-file }}" "$EDAM_URI_RE"
+      - id: annotate
+        uses: actions/ai-inference@v3
+        with:
+          prompt-file: ./.github/prompts/edam-annotate.prompt.yml
+          file_input: |
+            meta: ./fixtures/meta.yml
+          model: claude-haiku-5.5
+          copilot-allow-tools: edam
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+      - run: scripts/assert_contains.sh "${{ steps.annotate.outputs.response-file }}" "$EDAM_URI_RE"

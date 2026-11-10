@@ -1,0 +1,14 @@
+name: bwa_mem
+description: Map low-divergence sequencing reads against a large reference genome with the Burrows-Wheeler Aligner
+keywords:
+  - alignment
+  - short reads
+  - genome
+input:
+  - reads:
+      type: file
+      description: Short reads in FASTQ format
+output:
+  - bam:
+      type: file
+      description: Alignments in BAM format
